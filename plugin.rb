@@ -193,6 +193,8 @@ register_css <<CSS
 
   button.btn-social.oauth2_basic {
     background-color: #6d6d6d;
+    background-image: url("https://web.ccpgamescdn.com/eveonlineassets/developers/eve-sso-login-white-small.png");
+    background-repeat: no-repeat;
   }
 
 CSS
