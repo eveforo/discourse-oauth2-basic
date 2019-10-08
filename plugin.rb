@@ -196,12 +196,17 @@ register_css <<CSS
     background-repeat: no-repeat;
     background-size: cover;
     border-radius: 5px;
+    font-size: 0px;
   }
   button.btn-social.oauth2_basic * {
     display: none;
   }
   button.btn-social.oauth2_basic:hover {
     background-image: url("https://web.ccpgamescdn.com/eveonlineassets/developers/eve-sso-login-black-small.png");
+    background-size: cover;
+    background-repeat: no-repeat;
+    border-radius: 5px;
+    font-size: 0px;
   }
 
 CSS
