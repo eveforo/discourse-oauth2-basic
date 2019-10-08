@@ -203,7 +203,7 @@ register_css <<CSS
   button.btn-social.oauth2_basic:hover {
     background-image: url("https://web.ccpgamescdn.com/eveonlineassets/developers/eve-sso-login-black-small.png");
   }
-  
+
 CSS
 
 load File.expand_path("../lib/validators/oauth2_basic/oauth2_fetch_user_details_validator.rb", __FILE__)
