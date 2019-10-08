@@ -184,12 +184,26 @@ class OAuth2BasicAuthenticator < Auth::ManagedAuthenticator
   end
 end
 
-auth_provider title_setting: "",
+auth_provider title_setting: "oauth2_button_title",
               authenticator: OAuth2BasicAuthenticator.new,
               message: "OAuth2",
               full_screen_login_setting: "oauth2_full_screen_login"
 
 register_css <<CSS
+
+  button.btn-social.oauth2_basic {
+    background-image: url("https://web.ccpgamescdn.com/eveonlineassets/developers/eve-sso-login-white-small.png");
+    background-repeat: no-repeat;
+    background-size: cover;
+    border-radius: 5px;
+  }
+  button.btn-social.oauth2_basic * {
+    display: none;
+  }
+  button.btn-social.oauth2_basic:hover {
+    background-image: url("https://web.ccpgamescdn.com/eveonlineassets/developers/eve-sso-login-black-small.png");
+  }
+  
 CSS
 
 load File.expand_path("../lib/validators/oauth2_basic/oauth2_fetch_user_details_validator.rb", __FILE__)
