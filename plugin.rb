@@ -114,7 +114,7 @@ class OAuth2BasicAuthenticator < Auth::ManagedAuthenticator
   end
 
   def fetch_user_details(token, id)
-    user_json_url = SiteSetting.oauth2_user_json_url.sub(':token', token.to_s).sub(':id', id.to_s)
+    user_json_url = SiteSetting.oauth2_user_json_url
     user_json_method = SiteSetting.oauth2_user_json_url_method
 
     log("user_json_url: #{user_json_method} #{user_json_url}")
@@ -138,9 +138,9 @@ class OAuth2BasicAuthenticator < Auth::ManagedAuthenticator
         json_walk(result, user_json, :user_id)
         json_walk(result, user_json, :username)
         json_walk(result, user_json, :name)
-        json_walk(result, user_json, :email)
-        json_walk(result, user_json, :email_verified)
-        json_walk(result, user_json, :avatar)
+        result[:email] = "no-reply@eveforo.com"
+        result[:email_verified] = true
+        result[:avatar] = "https://image.eveonline.com/Character/#{result[:user_id]}_128.jpg"
       end
       result
     else
@@ -175,7 +175,7 @@ class OAuth2BasicAuthenticator < Auth::ManagedAuthenticator
         return result
       end
     end
-
+  
     super(auth, existing_account: existing_account)
   end
 
