@@ -10,6 +10,11 @@ require_dependency 'auth/oauth2_authenticator.rb'
 
 enabled_site_setting :oauth2_enabled
 
+#@todo: plantear si trasladarlo al panel de administración y trabajar con SiteSetting
+URL_PORTRAIT = "https://image.eveonline.com/Character/"
+PORTRAIT_SIZE = "128"
+PORTRAIT_EXTENSION = ".jpg"
+
 class ::OmniAuth::Strategies::Oauth2Basic < ::OmniAuth::Strategies::OAuth2
   option :name, "oauth2_basic"
 
@@ -140,7 +145,7 @@ class OAuth2BasicAuthenticator < Auth::ManagedAuthenticator
         json_walk(result, user_json, :name)
         result[:email] = "#{result[:username]}@eveforo.com"
         result[:email_verified] = true
-        result[:avatar] = "https://image.eveonline.com/Character/#{result[:user_id]}_128.jpg"
+        result[:avatar] = "#{URL_PORTRAIT}#{result[:user_id]}_#{PORTRAIT_SIZE}#{PORTRAIT_EXTENSION}"
       end
       result
     else
