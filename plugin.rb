@@ -10,6 +10,11 @@ require_dependency 'auth/oauth2_authenticator.rb'
 
 enabled_site_setting :oauth2_enabled
 
+#@todo: plantear si trasladarlo al panel de administración y trabajar con SiteSetting
+URL_PORTRAIT = "https://image.eveonline.com/Character/"
+PORTRAIT_SIZE = "128"
+PORTRAIT_EXTENSION = ".jpg"
+
 class ::OmniAuth::Strategies::Oauth2Basic < ::OmniAuth::Strategies::OAuth2
   option :name, "oauth2_basic"
 
@@ -114,7 +119,7 @@ class OAuth2BasicAuthenticator < Auth::ManagedAuthenticator
   end
 
   def fetch_user_details(token, id)
-    user_json_url = SiteSetting.oauth2_user_json_url.sub(':token', token.to_s).sub(':id', id.to_s)
+    user_json_url = SiteSetting.oauth2_user_json_url
     user_json_method = SiteSetting.oauth2_user_json_url_method
 
     log("user_json_url: #{user_json_method} #{user_json_url}")
@@ -137,10 +142,12 @@ class OAuth2BasicAuthenticator < Auth::ManagedAuthenticator
       if user_json.present?
         json_walk(result, user_json, :user_id)
         json_walk(result, user_json, :username)
+        #por configuracion interna el sistema no permie usernames con espacios.
+        result[:username] = result[:username].gsub(' ', '_')
         json_walk(result, user_json, :name)
-        json_walk(result, user_json, :email)
-        json_walk(result, user_json, :email_verified)
-        json_walk(result, user_json, :avatar)
+        result[:email] = "#{result[:username].downcase}@eveforo.com"
+        result[:email_verified] = true
+        result[:avatar] = "#{URL_PORTRAIT}#{result[:user_id]}_#{PORTRAIT_SIZE}#{PORTRAIT_EXTENSION}"
       end
       result
     else
@@ -168,6 +175,28 @@ class OAuth2BasicAuthenticator < Auth::ManagedAuthenticator
         ['name', 'email', 'email_verified'].each do |property|
           auth['info'][property] = fetched_user_details[property.to_sym] if fetched_user_details[property.to_sym]
         end
+        log("after_authenticate auth: #{auth.to_hash}")
+
+        # Try and find an association for this account
+        association = UserAssociatedAccount.find_or_initialize_by(provider_name: auth[:provider], provider_uid: auth[:uid])
+
+        if association.user.nil?
+          params = {
+            :email => fetched_user_details[:email],
+            :name => fetched_user_details[:name],
+            :username => fetched_user_details[:username]
+          }
+          session = auth["session"]
+          existing_account = create_user(params, session)
+          if existing_account.nil?
+            result = Auth::Result.new
+            result.failed = true
+            result.failed_reason = I18n.t("login.incorrect_username_email_or_password")
+            return result
+          end
+        else
+          existing_account = association.user
+        end
       else
         result = Auth::Result.new
         result.failed = true
@@ -181,6 +210,33 @@ class OAuth2BasicAuthenticator < Auth::ManagedAuthenticator
 
   def enabled?
     SiteSetting.oauth2_enabled
+  end
+
+  def create_user(params, session)
+    #copy paste del controlador app/users_controller.rd"
+    #de la función create
+    unless SiteSetting.allow_new_registrations
+      return nil
+    end
+    params[:locale] = I18n.locale
+    user = User.unstage(params)
+    user = User.new_from_params(params) if user.nil?
+    user.password = SecureRandom.hex
+
+    # Handle API approval
+    ReviewableUser.set_approved_fields!(user, current_user) if user.approved?
+
+    authentication = UserAuthenticator.new(user, session)
+    authentication.start
+    
+    if user.save
+      authentication.finish
+
+      session["user_created_message"] = ""
+      session[SessionController::ACTIVATE_USER_KEY] = user.id
+
+      return user
+    end
   end
 end
 
