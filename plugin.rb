@@ -169,13 +169,21 @@ class OAuth2BasicAuthenticator < Auth::ManagedAuthenticator
           auth['info'][property] = fetched_user_details[property.to_sym] if fetched_user_details[property.to_sym]
         end
         log("after_authenticate auth: #{auth.to_hash}")
-        params = {
-          :email => fetched_user_details[:email],
-          :name => fetched_user_details[:name],
-          :username => fetched_user_details[:name]
-        }
-        session = auth["session"]
-        existing_account = create_user(params, session)
+
+        # Try and find an association for this account
+        association = UserAssociatedAccount.find_or_initialize_by(provider_name: auth[:provider], provider_uid: auth[:uid])
+
+        if association.user.nil?
+          params = {
+            :email => fetched_user_details[:email],
+            :name => fetched_user_details[:name],
+            :username => fetched_user_details[:name]
+          }
+          session = auth["session"]
+          existing_account = create_user(params, session)
+        else
+          existing_account = association.user
+        end
       else
         result = Auth::Result.new
         result.failed = true
@@ -183,7 +191,7 @@ class OAuth2BasicAuthenticator < Auth::ManagedAuthenticator
         return result
       end
     end
-  
+
     super(auth, existing_account: existing_account)
   end
 
@@ -194,8 +202,6 @@ class OAuth2BasicAuthenticator < Auth::ManagedAuthenticator
   def create_user(params, session)
     #copy paste del controlador app/users_controller.rd"
     #de la función create
-    log("create_user params: #{params.to_hash}")
-    log("create_user session: #{session.to_hash}")
     unless SiteSetting.allow_new_registrations
       return fail_with("login.new_registrations_disabled")
     end
