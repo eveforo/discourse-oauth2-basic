@@ -138,7 +138,7 @@ class OAuth2BasicAuthenticator < Auth::ManagedAuthenticator
         json_walk(result, user_json, :user_id)
         json_walk(result, user_json, :username)
         json_walk(result, user_json, :name)
-        result[:email] = "no-reply@eveforo.com"
+        result[:email] = "#{result[:username]}@eveforo.com"
         result[:email_verified] = true
         result[:avatar] = "https://image.eveonline.com/Character/#{result[:user_id]}_128.jpg"
       end
@@ -168,6 +168,14 @@ class OAuth2BasicAuthenticator < Auth::ManagedAuthenticator
         ['name', 'email', 'email_verified'].each do |property|
           auth['info'][property] = fetched_user_details[property.to_sym] if fetched_user_details[property.to_sym]
         end
+        log("after_authenticate auth: #{auth.to_hash}")
+        params = {
+          :email => fetched_user_details[:email],
+          :name => fetched_user_details[:name],
+          :username => fetched_user_details[:name]
+        }
+        session = auth["session"]
+        existing_account = create_user(params, session)
       else
         result = Auth::Result.new
         result.failed = true
@@ -181,6 +189,64 @@ class OAuth2BasicAuthenticator < Auth::ManagedAuthenticator
 
   def enabled?
     SiteSetting.oauth2_enabled
+  end
+
+  def create_user(params, session)
+    #copy paste del controlador app/users_controller.rd"
+    #de la función create
+    log("create_user params: #{params.to_hash}")
+    log("create_user session: #{session.to_hash}")
+    unless SiteSetting.allow_new_registrations
+      return fail_with("login.new_registrations_disabled")
+    end
+    params[:locale] = I18n.locale
+    user = User.unstage(params)
+    user = User.new_from_params(params) if user.nil?
+    user.password = SecureRandom.hex if user.password.blank?
+
+    # Handle API approval
+    ReviewableUser.set_approved_fields!(user, current_user) if user.approved?
+
+    # Handle custom fields
+    user_fields = UserField.all
+    if user_fields.present?
+      field_params = params[:user_fields] || {}
+      fields = user.custom_fields
+
+      user_fields.each do |f|
+        field_val = field_params[f.id.to_s]
+        if field_val.blank?
+          return fail_with("login.missing_user_field") if f.required?
+        else
+          fields["#{User::USER_FIELD_PREFIX}#{f.id}"] = field_val[0...UserField.max_length]
+        end
+      end
+
+      user.custom_fields = fields
+    end
+
+    authentication = UserAuthenticator.new(user, session)
+
+    if !authentication.has_authenticator? && !SiteSetting.enable_local_logins
+      return render body: nil, status: :forbidden
+    end
+
+    authentication.start
+
+    if authentication.email_valid? && !authentication.authenticated?
+      # posted email is different that the already validated one?
+      return fail_with('login.incorrect_username_email_or_password')
+    end
+
+    if user.save
+      authentication.finish
+
+      # save user email in session, to show on account-created page
+      session["user_created_message"] = ""
+      session[SessionController::ACTIVATE_USER_KEY] = user.id
+
+      return user
+    end
   end
 end
 
