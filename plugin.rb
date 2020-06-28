@@ -219,16 +219,20 @@ class OAuth2BasicAuthenticator < Auth::ManagedAuthenticator
       return nil
     end
     params[:locale] = I18n.locale
-    user = User.unstage(params)
-    user = User.new_from_params(params) if user.nil?
+    # https://review.discourse.org/t/dev-replace-user-unstage-and-user-unstage-api-with-user-unstage-8906/9894
+    # https://github.com/discourse/discourse/pull/8906
+    # en caso de detectar error aplicar el mismo código que reemplaza a User.unstage(params)
+    #user = User.unstage(params)
+    user = User.new_from_params(params)
     user.password = SecureRandom.hex
+    user.unstage!
 
     # Handle API approval
     ReviewableUser.set_approved_fields!(user, current_user) if user.approved?
 
     authentication = UserAuthenticator.new(user, session)
     authentication.start
-    
+
     if user.save
       authentication.finish
 
